@@ -57,13 +57,15 @@ function initSocketServer(httpServer){
                 const chatHistoryPromise = (async () => {
                     await Message.create({
                         content: message.content,
-                        chat: chatId, // Changed from chatId to chat to match the schema
+                        chat: chatId,
                         user: socket.user._id,
                         sender: 'user',
+                        fileUrl: message.fileUrl,
+                        mimeType: message.mimeType,
                     });
                     return (await Message.find({
-                        chat: chatId, // Changed from chatId to chat to match the schema
-                    }).sort({createdAt: -1}).limit(20).lean()).reverse(); 
+                        chat: chatId,
+                    }).sort({createdAt: -1}).limit(6).lean()).reverse();  
                 })();
 
                 const [vector, chatHistory] = await Promise.all([vectorPromise, chatHistoryPromise]);
@@ -86,14 +88,36 @@ function initSocketServer(httpServer){
                     })
                 ]);
  
-                const stm =chatHistory.map((item)=>{
-                    return {
-                        role:item.sender,
-                        parts: [
-                            { text: item.content }
-                        ],
+                const stm = await Promise.all(chatHistory.map(async (item, index) => {
+                    const part = { text: item.content };
+                    
+                    // Add file inlineData for the most recent message
+                    if (item.fileUrl && item.mimeType && index === chatHistory.length - 1) {
+                        try {
+                            const fileResp = await fetch(item.fileUrl).then(res => res.arrayBuffer());
+                            const base64Data = Buffer.from(fileResp).toString("base64");
+                            return {
+                                role: item.sender,
+                                parts: [
+                                    part,
+                                    {
+                                        inlineData: {
+                                            mimeType: item.mimeType,
+                                            data: base64Data
+                                        }
+                                    }
+                                ]
+                            };
+                        } catch (err) {
+                            console.error("Failed to fetch file for Gemini:", err);
+                        }
                     }
-                });
+
+                    return {
+                        role: item.sender,
+                        parts: [part],
+                    };
+                }));
 
                 // Filter out undefined text from older Pinecone records
                 const retrievedTexts = VectorHistory.matches
@@ -101,15 +125,16 @@ function initSocketServer(httpServer){
                     .filter(Boolean) // removes undefined/null
                     .join("\n");
 
-                // Inject the LTM context as a System Instruction instead of modifying the user's prompt.
-                // This tells Gemini "You DO have memory, and here it is" rather than letting it dismiss the user's prompt.
-                let systemContext = "";
-                if (retrievedTexts) {
-                    systemContext = `You are a helpful AI assistant with access to a database of your past conversations with this user. 
-Here are relevant snippets from your past conversations with this user:
-${retrievedTexts}
+                // Inject the LTM context alongside a strict Persona Prompt
+                let systemContext = `You are Lawgic AI, an elite legal assistant. 
+CRITICAL INSTRUCTIONS TO MINIMIZE TOKEN USAGE:
+1. Be highly concise and direct. Do NOT use conversational filler words (e.g. "Certainly", "Here is").
+2. Structure your answers using bullet points and short, punchy sentences.
+3. Provide direct legal conclusions immediately.
+4. Format your output strictly in Markdown.`;
 
-IMPORTANT: You DO have memory. If the user asks about a past conversation, use the snippets above to answer them. DO NOT say you cannot recall past conversations.`;
+                if (retrievedTexts) {
+                    systemContext += `\n\nPast Memory Snippets for Context:\n${retrievedTexts}\n\nIMPORTANT: Use these snippets if the user asks about past conversations.`;
                 }
 
                 const response = await generateResponse(stm, systemContext);
@@ -146,11 +171,20 @@ IMPORTANT: You DO have memory. If the user asks about a past conversation, use t
                 });
             } catch (error) {
                 console.error("Error processing message:", error);
+                
+                let fallbackMsg = "An internal error occurred while processing your request.";
+                if (error.message && (error.message.includes("429") || error.message.includes("quota"))) {
+                    fallbackMsg = "I apologize, but I am currently experiencing high traffic and have exceeded my rate limit. Please wait a moment and try again.";
+                }
+                
+                io.to(socket.id).emit('ai-response', {
+                    content: fallbackMsg,
+                    chatId: chatId, 
+                });
             }
         });
-
         
-    })
+    });
     
 }   
 

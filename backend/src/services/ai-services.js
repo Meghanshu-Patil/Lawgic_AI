@@ -2,15 +2,17 @@ const { GoogleGenAI } = require("@google/genai");
 
 const ai = new GoogleGenAI({});
 
-async function generateResponse(message) {
+async function generateResponse(message, systemContext) {
 
     try {
         const response = await ai.models.generateContent({
+            // Ensure model supports multimodal if files are passed
             model: "gemini-2.5-flash-lite",
             contents: message,
             config: {
                 temperature: 0.5,
                 systemInstruction: `
+                ${systemContext ? systemContext + '\n\n' : ''}
                 You are an AI Legal Assistant designed to provide accurate, structured, and context-aware information related to law. Your primary objective is to assist users in understanding legal concepts, procedures, and frameworks while maintaining strict adherence to ethical, jurisdictional, and professional limitations.
 
                 CORE ROLE & IDENTITY:
@@ -82,7 +84,8 @@ async function generateResponse(message) {
         // console.log(response);  
         return response.text;
     } catch (error) {
-        return `Failed to generate response , ${error.message}`;
+        console.error("Gemini API Error:", error.message);
+        throw error;
     }
 }
 

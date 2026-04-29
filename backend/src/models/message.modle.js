@@ -21,8 +21,15 @@ const messageSchema = new mongoose.Schema({
         enum:['user','model'],
         required:true,
     },
-    
-},{
+    fileUrl: {
+        type: String,
+        required: false,
+    },
+    mimeType: {
+        type: String,
+        required: false,
+    }
+}, {
     timestamps:true});
 
 const message = mongoose.model('Message', messageSchema);

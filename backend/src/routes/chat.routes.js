@@ -5,13 +5,8 @@ const chatRoute = express.Router();
 
 
 chatRoute.post("/",authMiddleware,chatControler.createChats);
-
-
-
-
-
-
-
-
+chatRoute.get("/", authMiddleware, chatControler.getUserChats);
+chatRoute.get("/:chatId/messages", authMiddleware, chatControler.getChatMessages);
+chatRoute.delete("/:chatId", authMiddleware, chatControler.deleteChat);
 
 module.exports = chatRoute;

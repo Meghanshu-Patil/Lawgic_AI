@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import { Scale, Paperclip, Send, Loader2, PlusCircle, FileText, Image as ImageIcon, Trash2, X, UploadCloud } from 'lucide-react';
+import { Scale, Paperclip, Send, Loader2, PlusCircle, FileText, Image as ImageIcon, Trash2, X, UploadCloud, Moon, Sun } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useNavigate } from 'react-router-dom';
@@ -17,12 +17,76 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
-  
+
   // New Chat Modal State
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [newChatTitle, setNewChatTitle] = useState('');
-  
+
+  // User & Theme State
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [user, setUser] = useState(null);
+
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("Error parsing user", e);
+      }
+    }
+    const darkMode = localStorage.getItem('darkMode') === 'true';
+    setIsDarkMode(darkMode);
+    if (darkMode) {
+      document.body.classList.add('dark-mode');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const newMode = !prev;
+      localStorage.setItem('darkMode', newMode);
+      if (newMode) {
+        document.body.classList.add('dark-mode');
+      } else {
+        document.body.classList.remove('dark-mode');
+      }
+      return newMode;
+    });
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    navigate('/auth');
+  };
+
+  const getInitials = () => {
+    if (user?.fullName?.firstName && user?.fullName?.lastName) {
+      return `${user.fullName.firstName[0]}${user.fullName.lastName[0]}`.toUpperCase();
+    }
+    if (user?.fullname?.firstName && user?.fullname?.lastName) {
+      return `${user.fullname.firstName[0]}${user.fullname.lastName[0]}`.toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    return "U";
+  };
+
+  const getFullName = () => {
+    if (user?.fullName?.firstName && user?.fullName?.lastName) {
+      return `${user.fullName.firstName} ${user.fullName.lastName}`;
+    }
+    if (user?.fullname?.firstName && user?.fullname?.lastName) {
+      return `${user.fullname.firstName} ${user.fullname.lastName}`;
+    }
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    return "User";
+  };
 
   // Auto-scroll
   useEffect(() => {
@@ -113,7 +177,7 @@ export default function Dashboard() {
   const createNewChat = async (e) => {
     if (e) e.preventDefault();
     const finalTitle = newChatTitle.trim() || "New Legal Case";
-    
+
     try {
       const res = await fetch('/chat', {
         method: 'POST',
@@ -172,11 +236,11 @@ export default function Dashboard() {
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const droppedFile = e.dataTransfer.files[0];
       const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-      
+
       if (validTypes.includes(droppedFile.type)) {
         setFile(droppedFile);
       } else {
@@ -230,7 +294,7 @@ export default function Dashboard() {
       mimeType,
       fileName: file ? file.name : null
     };
-    
+
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setFile(null);
@@ -264,9 +328,9 @@ export default function Dashboard() {
       <aside className="sidebar glass-panel">
         <div className="sidebar-header">
           <Scale size={32} className="brand-icon" />
-          <h2>Lawgic Counsel</h2>
+          <h2>Lawgic</h2>
         </div>
-        
+
         <button className="btn-primary new-chat-btn" onClick={() => setShowNewChatModal(true)}>
           <PlusCircle size={18} />
           <span>New Case File</span>
@@ -275,10 +339,10 @@ export default function Dashboard() {
         <div className="chat-history-list">
           {chats.map(c => {
             // Backend might return _id or id depending on the query vs create response
-            const cId = c._id || c.id; 
+            const cId = c._id || c.id;
             return (
-              <div 
-                key={cId} 
+              <div
+                key={cId}
                 className={`history-item ${chatId === cId ? 'active' : ''}`}
                 onClick={() => setChatId(cId)}
               >
@@ -295,10 +359,25 @@ export default function Dashboard() {
             );
           })}
         </div>
+        <div className="sidebar-footer">
+          <div className="user-profile-wrapper">
+            <div className="avatar">{getInitials()}</div>
+            <div className="user-info">
+              <span className="user-name">{getFullName()}</span>
+              <span className="user-role">Lead Counsel</span>
+            </div>
+            <div className="user-actions">
+              <button className="icon-btn" onClick={handleLogout} title="Logout"><X size={16} /></button>
+              <button className="icon-btn" onClick={toggleDarkMode} title="Toggle Dark Mode">
+                {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            </div>
+          </div>
+        </div>
       </aside>
 
       {/* Main Chat Area */}
-      <main 
+      <main
         className="chat-main"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -310,7 +389,7 @@ export default function Dashboard() {
             <h2>Drop document or image here to attach</h2>
           </div>
         )}
-        
+
         <header className="chat-header glass-panel">
           <h3>Case File Reference: {chatId ? chatId.slice(-6).toUpperCase() : 'LOADING...'}</h3>
           <div className="status-indicator">
@@ -353,27 +432,27 @@ export default function Dashboard() {
               <button type="button" onClick={() => setFile(null)}>×</button>
             </div>
           )}
-          
+
           <form onSubmit={sendMessage} className="chat-input-form">
             <label className="attachment-btn" title="Attach Document (PDF/Image)">
-              <input 
-                type="file" 
+              <input
+                type="file"
                 accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
-                onChange={handleFileChange} 
-                style={{ display: 'none' }} 
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
               />
               <Paperclip size={22} />
             </label>
-            
-            <input 
-              type="text" 
-              className="chat-input input-formal" 
-              placeholder="Detail your legal query or attach a document..." 
+
+            <input
+              type="text"
+              className="chat-input input-formal"
+              placeholder="Detail your legal query or attach a document..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isUploading}
             />
-            
+
             <button type="submit" className="send-btn btn-accent" disabled={isUploading || (!input.trim() && !file)}>
               {isUploading ? <Loader2 className="spinner" size={20} /> : <Send size={20} />}
             </button>
@@ -391,8 +470,8 @@ export default function Dashboard() {
             </div>
             <form onSubmit={createNewChat} className="modal-body">
               <label>Case File Name</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 className="input-formal"
                 placeholder="e.g. Smith vs. Jones 2026"
                 value={newChatTitle}
@@ -410,3 +489,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Scale } from 'lucide-react';
+import { Scale, Moon, Sun } from 'lucide-react';
 import './Auth.css';
 
 export default function Auth() {
@@ -13,14 +13,38 @@ export default function Auth() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  React.useEffect(() => {
+    const darkMode = localStorage.getItem('darkMode') === 'true';
+    setIsDarkMode(darkMode);
+    if (darkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const newMode = !prev;
+      localStorage.setItem('darkMode', newMode);
+      if (newMode) {
+        document.body.classList.add('dark-mode');
+      } else {
+        document.body.classList.remove('dark-mode');
+      }
+      return newMode;
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     const endpoint = isLogin ? '/auth/login' : '/auth/register';
-    const payload = isLogin 
-      ? { email, password } 
+    const payload = isLogin
+      ? { email, password }
       : { fullname: { firstName, lastName }, email, password };
 
     try {
@@ -37,6 +61,10 @@ export default function Auth() {
       }
 
       // If successful, the backend sets an HttpOnly cookie or standard cookie.
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+
       // We can just navigate to dashboard
       navigate('/dashboard');
     } catch (err) {
@@ -53,11 +81,14 @@ export default function Auth() {
           <p className="auth-subtitle">Your Legal Counsel & Document Analysis Assistant</p>
         </div>
       </div>
-      
+
       <div className="auth-split-right">
+        <button className="auth-theme-toggle" onClick={toggleDarkMode} title="Toggle Dark Mode">
+          {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
         <div className="auth-form-wrapper glass-panel">
           <h2>{isLogin ? 'Enter the Chambers' : 'Register your Counsel'}</h2>
-          
+
           {error && <div className="auth-error">{error}</div>}
 
           <form onSubmit={handleSubmit} className="auth-form">
@@ -65,46 +96,46 @@ export default function Auth() {
               <div className="form-row">
                 <div className="form-group">
                   <label>First Name</label>
-                  <input 
-                    type="text" 
-                    className="input-formal" 
+                  <input
+                    type="text"
+                    className="input-formal"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    required 
+                    required
                   />
                 </div>
                 <div className="form-group">
                   <label>Last Name</label>
-                  <input 
-                    type="text" 
-                    className="input-formal" 
+                  <input
+                    type="text"
+                    className="input-formal"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    required 
+                    required
                   />
                 </div>
               </div>
             )}
-            
+
             <div className="form-group">
               <label>Email Address</label>
-              <input 
-                type="email" 
-                className="input-formal" 
+              <input
+                type="email"
+                className="input-formal"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required 
+                required
               />
             </div>
-            
+
             <div className="form-group">
               <label>Password</label>
-              <input 
-                type="password" 
-                className="input-formal" 
+              <input
+                type="password"
+                className="input-formal"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required 
+                required
               />
             </div>
 
